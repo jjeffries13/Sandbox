@@ -1,0 +1,202 @@
+---
+title: "Exploratory Structural Equation Modelling"
+author: "Jay Jeffries"
+date: "1/10/2023"
+output: 
+  rmdformats::robobook:
+    code_folding: show
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+pkgdown:
+  as_is: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pacman)
+p_load("lavaan", "devtools", "dataxray", "tidyverse", "skimr", "Hmisc", "psych")
+# devtools::install_github("agstn/dataxray")
+
+# Name of first dataset "Tests"
+# Renaming columns
+Tests <- Tests |> rename(
+  verbal1 = x1,
+  verbal2 = x2,
+  verbal3 = x3,
+  math1 = y1,
+  math2 = y2,
+  math3 = y3,
+  )
+
+Tests$verbal <- rowSums(Tests[,1:3], na.rm = T)/3
+Tests$math <- rowSums(Tests[,4:6], na.rm = T)/3
+
+# Name of second dataset = "HolzingerSwineford1939"
+
+HolzingerSwineford1939 <- HolzingerSwineford1939 |> rename(
+  visual1 = x1,
+  visual2 = x2,
+  visual3 = x3,
+  text1 = x4,
+  text2 = x5,
+  text3 = x6,
+  speed1 = x7,
+  speed2 = x8,
+  speed3 = x9
+  )
+
+HolzingerSwineford1939$visual <- rowSums(HolzingerSwineford1939[,7:9])/3
+HolzingerSwineford1939$text <- rowSums(HolzingerSwineford1939[,10:12])/3
+HolzingerSwineford1939$speed <- rowSums(HolzingerSwineford1939[,13:15])/3
+```
+
+## Data Exploration
+
+Using `{skimr}` package for data exploration.
+
+#### Dataset 1 Descriptives
+```{r}
+skim(Tests)
+```
+
+#### Dataset 2 Descriptives
+```{r}
+skim(HolzingerSwineford1939)
+```
+
+## Bivariate Correlation
+
+Using `{Hmisc}` package for correlation matrix.
+
+* Found via average or summing scores 
+* Simple model structure (items map only to single construct)
+* Measured without measurement error
+* Substantially inflates size of correlation
+
+#### Dataset 1 Correlation Matrix
+```{r}
+corr_mat1 <- rcorr(as.matrix(Tests))
+corr_mat1
+```
+
+#### Dataset 2 Correlation Matrix
+```{r}
+corr_mat2 <- rcorr(as.matrix(HolzingerSwineford1939[, 7:18]))
+corr_mat2
+```
+
+## Confirmatory Factor Analysis Approach
+
+Using the `{lavaan}` package.
+
+* Items load only on *one* factor -- the one they are hypothesized to load onto
+  * Restrictive, independent clustering of items
+* Cross-loadings constrained to zero
+* Moderately inflates size of correlation
+
+#### Dataset 1 Model
+```{r}
+model1 <- '
+Verbal =~ verbal1 + verbal2 + verbal3
+Math =~ math1 + math2 + math3
+
+Verbal ~~ Math
+'
+
+fit_model1 <- cfa(model1, data = Tests)
+summary(fit_model1, standardized = T, fit.measures = T)
+```
+
+#### Dataset 2 Model
+```{r}
+model12.1<- '
+Visual =~ visual1 + visual2 + visual3
+Text =~ text1 + text2 + text3
+
+Visual ~~ Text
+'
+
+fit_model2.1 <- cfa(model12.1, data = HolzingerSwineford1939)
+summary(fit_model2.1, standardized = T, fit.measures = T)
+```
+
+## Exploratory Structural Equation Modelling Approach
+
+[Site for syntax](https://sites.psu.edu/yuweili/research-methods/bifactor-esem/)
+[Other site for syntax](https://msilvestrin.me/post/esem/)
+
+* Uninflated factor correlation
+* Cross-loadings estimated, even if small
+* Improvement to fit indices
+
+#### EFA for Model 1 Start Values
+```{r}
+model1_EFA <- fa(Tests[,1:6], nfactors = 2, rotate = "geominQ", fm = 'ML', delta = .5)
+model1_EFA$loadings
+```
+
+#### Model 1 ESEM
+```{r}
+model1_2 <- '
+Verbal =~ verbal1 + verbal2 + verbal3 + math1 + math2 + math3
+Math =~ math1 + math2 + math3 + verbal1 + verbal2 + verbal3
+
+Verbal ~~ Math
+'
+
+fit_model1_2 <- cfa(model1_2, data = Tests)
+summary(fit_model1_2, standardized = T, fit.measures = T)
+```
+
+#### EFA for Model 2 Start Values
+```{r}
+model2.1_EFA <- fa(HolzingerSwineford1939[,7:12], nfactors = 3, rotate = "geominQ", fm = 'ML', delta = .5)
+model2.1_EFA$loadings
+```
+
+```{r}
+fit <- efa(data = HolzingerSwineford1939[,7:15], nfactors = 1:3)
+summary(fit)
+```
+
+
+#### Model 2 ESEM
+```{r}
+model1_2.1 <- '
+Visual =~ start(0.564)*visual1 + start(0.448)*visual2 + start(0.762)*visual3 + 
+          start(0.102)*text1 + start()*text2 + start(0.145)*text3
+
+Text =~ start(0.219)*text1 + text2 + text3 + 
+        start(0.816)*visual1 + start(0.881)*visual2 + start(0.788)*visual3
+
+Visual ~~ Text
+'
+
+fit_model1_2.1 <- cfa(model1_2.1, data = HolzingerSwineford1939, std.lv = T)
+summary(fit_model1_2.1, standardized = T, fit.measures = T)
+```
+
+```{r}
+model <- '
+    # efa block 1
+    efa("efa1")*f1 + 
+    efa("efa1")*f2 =~ x1 + x2 + x3 + x4 + x5 + x6
+
+    # efa block 2
+    efa("efa2")*f3 + 
+    efa("efa2")*f4 =~ y1 + y2 + y3 + y4 + y5 + y6
+
+    # cfa block
+    f5 =~ z7 + z8 + z9
+    f6 =~ z10 + z11 + z12
+
+    # regressions
+    f3 ~ f1 + f2
+    f4 ~ f3
+'
+
+fit.model <- cfa(model, data = HolzingerSwineford1939, std.lv = T)
+summary(fit.model, standardized = T, fit.measures = T)
+```
