@@ -1,0 +1,109 @@
+---
+title: "Packages Of Interest"
+author: "Jay Jeffries"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Colorblind-Friendly Palettes
+### {col4all}
+
+```{r cars, echo = F}
+library(cols4all)
+library(colorspace)
+library(abind)
+library(shiny)
+
+# c4a_gui()
+```
+
+## Interactive ggplot2 Data Visualizations
+### {esquisse} - French for *"sketch"*
+
+```{r pressure, echo=FALSE}
+library(esquisse)
+
+# squisse::esquisser()
+```
+
+## Download Data Files via Markdown Button
+### [{downloadthis}]("https://fmmattioni.github.io/downloadthis/articles/downloadthis.html")
+
+```{r}
+library(downloadthis)
+
+mtcars %>% # can also download a list of datasets via list(mtcars, iris) %>% but this can only save as .xlsx or .Rds file types
+  download_this(
+    output_name = "mtcars dataset",
+    output_extension = ".xlsx", # can substitute .csv or 
+    button_label = "Download mtcars Data as xlsx",
+    button_type = "primary", # can use "default", "success", "info", "warning", "danger" for different button colors 
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
+
+download_link(
+  link = "https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/jjeffries13/Technostress/blob/main/Technostress_Codebook.csv",
+  button_label = "Download csv Codebook File",
+  button_type = "danger",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = FALSE
+)
+```
+
+## Simplified Exploratory Data Analysis (EDA)
+### [{explore}]("https://github.com/rolkra/explore")
+
+```{r}
+library(explore)
+library(tibble)
+
+explore(sleep)
+
+# sleep |> report(output_dir = "/Users/jayjeffries/Desktop/R Resources", target = extra, split = F)
+
+explore(iris)
+```
+## Interactive Data Visualizations
+### [{loon}]("https://great-northern-diver.github.io/loon/")
+
+```{r}
+devtools::install_github("great-northern-diver/loon", subdir = "R")
+library(loon)
+
+h <- l_hist(quakes$depth,
+            yshows = "density",
+            showBinHandle = TRUE,
+            xlabel = "depth",
+            title = "Tonga trench earthquakes",
+            linkingGroup = "quakes")
+
+p <- l_plot(x = quakes$long, y = quakes$lat,
+            xlabel = "longitude", ylabel = "latitude",
+            linkingGroup = "quakes",
+            title = "Tonga trench earthquakes")
+
+with(l_scale3D(quakes),
+     l_plot3D(long, lat, depth, linkingGroup = "quakes")
+)
+
+NZFijiMap <- maps::map("world2", regions = c("New Zealand", "Fiji"), plot = FALSE)
+l_layer(p, NZFijiMap,
+        label = "New Zealand and Fiji",
+        color = "forestgreen",
+        index = "end")
+# facet `p`
+levels <- rep(NA, nrow(quakes))
+levels[quakes$mag < 5 & quakes$mag >= 4] <- "Light"
+levels[quakes$mag < 6 & quakes$mag >= 5] <- "Moderate"
+levels[quakes$mag >= 6] <- "Strong"
+l_facet(p, by = levels, 
+        linkingGroup = "quakes")
+
+```
+
