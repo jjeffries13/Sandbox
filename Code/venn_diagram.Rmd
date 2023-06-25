@@ -1,0 +1,109 @@
+---
+title: "Venn Diagrams & R-squared"
+author: "Jay Jeffries"
+date: "2023-06-25"
+output:
+  html_document:
+    theme: united
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pacman)
+p_load("tidyverse", "broom", "eulerr")
+# broom for converting models into data frames; eulerr for Venn diagrams
+```
+
+Much of this code derives from Andrew Heiss' [blog post](https://www.andrewheiss.com/blog/2021/08/21/r2-euler/).
+
+```{r}
+# sum of squares function
+ss <- function(x) {
+  sum((x - mean(x))^2)
+}
+```
+
+This will use a toy dataset from the NOAA Atlantic hurricane database data of the positions and attributes of storms from 1975-2021. This dataset includes wind speed (`wind`, storm's maximum sustained wind speed, in knots) and air pressure (`pressure`, at the storm's center, in millibars) found from the `storms` dataset in `{dplyr}`.
+
+```{r}
+data <- storms |> 
+  select(wind, pressure) |>
+  drop_na()
+
+ss_wind <- ss(data$wind)
+ss_pressure <- ss(data$pressure)
+
+data |>
+  summarise(`Mean Wind` = mean(wind, na.rm = T),
+            `SS Wind` = ss_wind,
+            `Mean Pressure` = mean(pressure, na.rm = T),
+            `SS Pressure` = ss_pressure)
+```
+
+Below is a visualization of how much variation either variable has.
+
+```{r}
+plot(euler(c("Wind" = ss_wind,
+             "Pressure" = ss_pressure)),
+     quantities = TRUE)
+```
+
+Let’s see how much of the variation between Y and X1 is shared:
+
+```{r}
+aov(wind ~ pressure, data = data)
+```
+
+10704179 sum-of-square "units" are shared between `wind` and `pressure` with 1693839 units of residuals (unshared variance). 
+
+We must subtract the shared space from both `wind` and `pressure`. We’ll extract the sum of squares value from aov() (using broom::tidy() to do so):
+
+```{r}
+ss_model <- aov(wind ~ pressure, data = storms) |>
+  tidy() |>
+  filter(term == "pressure") |>
+  pull(sumsq)
+
+ss_model
+```
+
+And now we visualize the overlapping sum of squares:
+
+```{r}
+plot(euler(c("Wind" = ss_wind - ss_model,
+             "Pressure" = abs(ss_pressure - ss_model),
+             "Wind&Pressure" = ss_model)),
+     quantities = TRUE)
+```
+
+The shaded area in the middle represents the amount of variation in Wind explained by Pressure, while Area "Wind" represents the unexplained portion of Pressure. In other words, the middle portion is the $R^2$ of the model, represented in formula as $R^2 \dfrac{Shared}{Wind + Shared} = \dfrac{10704179}{10704179 + 1693839}= 0.8634= 86.34\%$.
+
+To double-check our math, let's insert the same model into a regression model. 
+
+```{r}
+lm(wind ~ pressure, data = data) |>
+  glance() |>
+  pull(r.squared) |>
+  round(4)
+```
+
+These Venn diagrams and statistics can be related to correlations. The relationship between $R^2$ and correlation (*r*) is *r* = $\sqrt{R^2}$ (duh!). Below shows this relationship. 
+
+```{r}
+sqrt(0.8634) # square root of R^2 is the R correlation!
+
+cor(data$wind, data$pressure)
+```
+
+Although the correlation values are the same, the Venn diagram used above cannot naturally show whether the relationship is positive or negative (though can be revised with fill coloring). Rather, it simply shows shared variance. 
+
+```{r}
+plot(euler(c("Wind" = ss_wind - ss_model,
+             "Pressure" = abs(ss_pressure - ss_model),
+             "Wind&Pressure" = ss_model)),
+     quantities = TRUE,
+     fills = c("white", "lightgray", "indianred1"))
+```
+
