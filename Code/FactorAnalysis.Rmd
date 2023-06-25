@@ -1,0 +1,49 @@
+---
+title: "Factor Analysis"
+author: "Jay Jeffries"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+  theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+pacman::p_load("readxl", "psych", "GPArotation", "skimr",
+               install = T)
+```
+
+```{r, echo = F}
+FA_Data <- mtcars[,1:10]
+
+skim(FA_Data)
+```
+
+```{r, echo = F}
+cortest.bartlett(FA_Data) # statistically significant intercorrelation between variables
+
+KMO(FA_Data) # KMO test results in MSA above 0.6 = suggests there is at least one underlying factor
+# High measure of sampling adequacy (MSA) = no need to drop specific items
+```
+
+```{r, fig.align = 'center', echo = F, warning = F}
+scree(FA_Data)
+```
+
+```{r, align = 'center', echo = F}
+FA <- fa(FA_Data,
+         fm = "pa", # principal axis factoring 
+         nfactors = 2, # Arrived at 2 factors from above Scree plot
+         rotate = "oblimin", # oblique rotation
+         scores = "regression", # create regression-based factor scores that maximize variance
+         max.iter = 100, # upped the iterations from 50 to 100, likely unnecessary as well (easily converged)
+         n.obs = 172) # don't actually need this, the function reads til the last line of data
+
+factor.scores(x = FA_Data, f = FA, method = "Thurstone", impute = "median") # decide whether Thurstone or tenBerge is more appropriate
+# median imputation replaces missing values with the median value of that column (item)
+```
+
+```{r, fig.align = 'center', echo = F}
+fa.diagram(FA, digits = 2) # High intercorrelations between 4 factor solution
+```
