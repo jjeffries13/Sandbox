@@ -12,7 +12,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 
 library(pacman)
-p_load("tidyverse", "broom", "eulerr")
+p_load("tidyverse", "broom", "eulerr", "patchwork")
 # broom for converting models into data frames; eulerr for Venn diagrams
 ```
 
@@ -100,10 +100,79 @@ cor(data$wind, data$pressure)
 Although the correlation values are the same, the Venn diagram used above cannot naturally show whether the relationship is positive or negative (though can be revised with fill coloring). Rather, it simply shows shared variance. 
 
 ```{r}
-plot(euler(c("Wind" = ss_wind - ss_model,
+plot(euler(combinations = c("Wind" = ss_wind - ss_model,
              "Pressure" = abs(ss_pressure - ss_model),
              "Wind&Pressure" = ss_model)),
      quantities = TRUE,
      fills = c("white", "lightgray", "indianred1"))
+```
+
+```{r}
+p_load("patchwork", "grid", "latex2exp")
+
+nicer_plot <- plot(euler(combinations = c("Wind" = ss_wind - ss_model,
+                                          "Pressure" = abs(ss_pressure - ss_model),
+                                          "Wind&Pressure" = ss_model)),
+                   quantities = list(labels = c("A", "B", "C \n r = -.929")),
+                                    fontfamily = "sans",
+                                    fontsize = 16,
+                   fills = list(fill = c("#7FDBFF", "seagreen3", "indianred"),
+                               alpha = c(.5, 0.5, 0.5),
+                               labels = list(fontfamily = "sans",
+                                             fontface = "bold", fontsize = 24)))
+nicer_plot
+```
+
+Performed again but with `{palmerpenguin}` data!
+
+```{r}
+library(palmerpenguins)
+
+penguin_data <- penguins |>
+  drop_na(c(bill_depth_mm, bill_length_mm))
+
+ss_depth <- ss(penguin_data$bill_depth_mm)
+ss_length <- ss(penguin_data$bill_length_mm)
+
+plot(euler(c("Bill Depth" = ss_depth,
+             "Bill Length" = ss_length)),
+     quantities = TRUE)
+
+aov(bill_depth_mm ~ bill_length_mm, data = penguin_data) |>
+  summary()
+
+ss_model2 <- aov(bill_depth_mm ~ bill_length_mm, data = penguin_data) |>
+  tidy() |>
+  filter(term == "bill_length_mm") |>
+  pull(sumsq)
+
+lm(bill_depth_mm ~ bill_length_mm, data = penguin_data) |>
+  glance() |>
+  pull(r.squared) |>
+  round(4)
+
+plot(euler(c("Depth" = round(ss_depth - ss_model2, 2),
+             "Length" = abs(ss_length - ss_model2),
+             "Depth&Length" = round(ss_model2, 2))),
+     quantities = TRUE)
+
+cor.test(penguin_data$bill_depth_mm, penguin_data$bill_length_mm)
+```
+
+The shared variance between penguin bill depth and length (in mm) is $R^2 \dfrac{Shared}{Wind + Shared} = \dfrac{73.4732}{73.4732 + 1256.3614}= 0.0552 = 5.52\%$. The correlation is $\sqrt{0.0552}=0.2349$, but is *negatively* associated. 
+
+```{r, warning = F}
+nicer_plot2 <- plot(euler(combinations = c("Depth" = round(ss_depth - ss_model2, 2),
+                                           "Length" = abs(ss_length - ss_model2),
+                                           "Depth&Length" = round(ss_model2, 2))),
+                   quantities = list(labels = c("", "", 
+                                                as.expression(bquote("" ~ R^2 ~ "= 0.0552")))),
+                                    fontfamily = "sans",
+                                    fontsize = 16,
+                   fills = list(fill = c("#7FEBFF", "#6AAAFF", "white"),
+                               alpha = c(.5, 0.5, 0.5),
+                               labels = list(fontfamily = "sans",
+                                             fontface = "bold", fontsize = 24)))
+nicer_plot2
 ```
 
