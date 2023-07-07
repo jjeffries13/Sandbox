@@ -13,12 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 ### {col4all}
 
 ```{r cars, echo = F}
-library(cols4all)
-library(colorspace)
-library(abind)
-library(shiny)
+library(pacman)
+p_load("cols4all", "colorspace", "abind", "shiny", "purrr", "tidyverse", "here", "readxl", "ggplot2", install = T)
 
 # c4a_gui()
+```
+
+## Northern Color Palette
+### [{nord}]("https://cran.r-project.org/web/packages/nord/readme/README.html")
+
+```{r, fig.align = "center"}
+library(nord)
+
+par(mfrow=c(8, 2), lheight = 2, mar=rep(1, 4), adj = 0)
+
+walk(names(nord_palettes), nord_show_palette)
 ```
 
 ## Interactive ggplot2 Data Visualizations
@@ -69,6 +78,7 @@ explore(sleep)
 
 explore(iris)
 ```
+
 ## Interactive Data Visualizations
 ### [{loon}]("https://great-northern-diver.github.io/loon/")
 
@@ -105,5 +115,67 @@ levels[quakes$mag >= 6] <- "Strong"
 l_facet(p, by = levels, 
         linkingGroup = "quakes")
 
+```
+
+## Correlation Network
+### [Psychometric Summaries]("https://eiko-fried.com/creating-basic-psychometric-summaries-in-r/")
+
+```{r}
+p_load("psych", "qgraph", "bootnet", "OpenMx", "EGAnet", "lavaan", "sna", install = T)
+
+data <- read_excel(path = here("./Likert Data/data/TeacherBurnout copy.xlsx")) 
+data <- data |>
+  select(-districtID, -schoolID)
+
+cor_mat <- cor(data)
+# vechs() gives you the strict half-vectorization of an input matrix as a column vector; i.e., the correlations above the diagonal
+
+corr_desc <- summary(vechs(cor_mat)) # average correlation is 0.386
+as.numeric(corr_desc[4])
+
+qgraph(cor_mat, cut = 0, layout = "spring", 
+       title = paste("Correlation matrix, mean correlation = ", round(as.numeric(corr_desc[4]), digits = 2), sep = " "),
+       edge.width = .75, posCol = "steelblue4", negCol = "firebrick2")
+# optional argument for colorblind theme; theme = "colorblind"
+
+# Exploratory Graph Analysis (EGA) estimates the number of dimensions of a given dataset or correlation matrix based 
+# Edges correspond to partial correlation coefficients between two variables after conditioning on all other variables in the network
+# If items derive from same latent variable, two indicators cannot become independent after conditioning on observed variables because they are both caused by a latent variable (i.e., the edge strength between two indicators should not be zero).
+network_ega <- EGA(data, 
+                   corr = "pearson",
+                   model = "glasso", # graphical least absolute shrinkage and selection operator (glasso); computes partial correlation matrix
+                   algorithm = "walktrap") # walktrap algorithm is used to find the number of clusters of the partial correlation matrix
+summary(network_ega)
+# Golino et al. (2020) showed that the EGA method performs as well as the best factor-analytic techniques
+
+boot_EGA <- bootEGA(data, iter= 1000,  type = "resampling")
+
+boot_EGA$summary.table
+boot_EGA$frequency
+
+itemStability(boot_EGA)
+# All items elicit stability within their "item community"
+# Of the 1000 replications, TE5 remained in the same item community 93% of the time
+```
+
+## Plot Annotations
+### Using [{ggannotate}]("https://github.com/MattCowgill/ggannotate")
+
+```{r}
+# remotes::install_github("mattcowgill/ggannotate")
+library(ggannotate)
+
+plot <- mtcars |>
+  ggplot(aes(x = cyl)) +
+  geom_bar()
+
+# the below function opens a Shiny app window to add plot annotations via point-and-click methods
+# annotation options include text, labels (text in a textbox), rectangles, and curved arrows
+ggannotate(plot)
+
+p <- ggplot(mtcars, 
+            aes(x = wt, y = mpg)) + 
+  geom_point() 
+ggannotate(p)
 ```
 
